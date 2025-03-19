@@ -658,14 +658,13 @@ int LibvpxVp9Encoder::InitEncode(const VideoCodec* inst,
   config_->rc_dropframe_thresh = inst->GetFrameDropEnabled() ? 30 : 0;
   config_->rc_end_usage = VPX_CBR;
   config_->g_pass = VPX_RC_ONE_PASS;
-  config_->rc_min_quantizer =
-      codec_.mode == VideoCodecMode::kScreensharing ? 8 : 2;
-  config_->rc_max_quantizer = 52;
-  config_->rc_undershoot_pct = 50;
-  config_->rc_overshoot_pct = 50;
-  config_->rc_buf_initial_sz = 500;
-  config_->rc_buf_optimal_sz = 600;
-  config_->rc_buf_sz = 1000;
+  config_->rc_min_quantizer = 4;
+  config_->rc_max_quantizer = 36;
+  config_->rc_undershoot_pct = 100;
+  config_->rc_overshoot_pct = 15;
+  config_->rc_buf_initial_sz = 0;
+  config_->rc_buf_optimal_sz = 200;
+  config_->rc_buf_sz = 300;
   // Set the maximum target size of any key-frame.
   rc_max_intra_target_ = MaxIntraTarget(config_->rc_buf_optimal_sz);
   // Key-frame interval is enforced manually by this wrapper.
@@ -868,7 +867,7 @@ int LibvpxVp9Encoder::InitAndSetControlSettings(const VideoCodec* inst) {
   libvpx_->codec_control(encoder_, VP9E_SET_AQ_MODE,
                          inst->VP9().adaptiveQpMode ? 3 : 0);
 
-  libvpx_->codec_control(encoder_, VP9E_SET_FRAME_PARALLEL_DECODING, 0);
+  libvpx_->codec_control(encoder_, VP9E_SET_FRAME_PARALLEL_DECODING, 1);
   libvpx_->codec_control(encoder_, VP9E_SET_SVC_GF_TEMPORAL_REF, 0);
 
   if (is_svc_) {
@@ -965,6 +964,9 @@ int LibvpxVp9Encoder::InitAndSetControlSettings(const VideoCodec* inst) {
   }
   // Enable encoder skip of static/low content blocks.
   libvpx_->codec_control(encoder_, VP8E_SET_STATIC_THRESHOLD, 1);
+  libvpx_->codec_control(encoder_, VP8E_SET_ENABLEAUTOALTREF, 6);
+  libvpx_->codec_control(encoder_, VP8E_SET_ARNR_MAXFRAMES, 5);
+  libvpx_->codec_control(encoder_, VP8E_SET_ARNR_STRENGTH, 5);
   inited_ = true;
   config_changed_ = true;
   return WEBRTC_VIDEO_CODEC_OK;

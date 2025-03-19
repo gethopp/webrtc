@@ -249,6 +249,7 @@ VideoCodec VideoCodecInitializer::SetupCodec(
           spatial_layers.back().minBitrate = video_codec.minBitrate;
           spatial_layers.back().targetBitrate = video_codec.maxBitrate;
           spatial_layers.back().maxBitrate = video_codec.maxBitrate;
+          spatial_layers.back().maxFramerate = video_codec.maxFramerate;
         }
 
         for (size_t spatial_idx = first_active_layer;
