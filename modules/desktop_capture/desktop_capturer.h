@@ -52,7 +52,10 @@ class RTC_EXPORT DesktopCapturer {
     // CaptureFrame() again.
     ERROR_PERMANENT,
 
-    MAX_VALUE = ERROR_PERMANENT
+    // The user intentionally stopped the stream
+    ERROR_USER_STOPPED,
+
+    MAX_VALUE = ERROR_USER_STOPPED
   };
 
   // Interface that must be implemented by the DesktopCapturer consumers.
