@@ -140,6 +140,10 @@ class RTC_EXPORT DesktopCapturer {
   // screen capturing.
   virtual void SetExcludedWindow(WindowId window);
 
+  // Takes the process id as input.
+  virtual void SetExcludedApplications(
+      std::vector<uint64_t> &&excluded_applications) {}
+
   // TODO(zijiehe): Following functions should be pure virtual. The default
   // implementations are for backward compatibility only. Remove default
   // implementations once all DesktopCapturer implementations in Chromium have

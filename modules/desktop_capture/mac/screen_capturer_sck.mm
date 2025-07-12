@@ -97,6 +97,10 @@ class API_AVAILABLE(macos(14.0)) ScreenCapturerSck final
   // arbitrary thread.
   void OnNewIOSurface(IOSurfaceRef io_surface, NSDictionary* attachment);
 
+  void SetExcludedApplications(std::vector<std::uint64_t> &&excluded_applications) override {
+    excluded_applications_ = std::move(excluded_applications);
+  }
+
  private:
   // Called when starting the capturer or the configuration has changed (either
   // from a SelectSource() call, or the screen-resolution has changed). This
@@ -178,6 +182,9 @@ class API_AVAILABLE(macos(14.0)) ScreenCapturerSck final
   // to fit the entire source without downscaling.
   std::optional<CGSize> frame_reconfigure_img_size_
       RTC_GUARDED_BY(latest_frame_lock_);
+
+  // List with application process ids to be excluded from the capture.
+  std::vector<std::uint64_t> excluded_applications_;
 };
 
 /* Helper class for stringifying SCContentSharingPickerMode. Needed as
@@ -514,9 +521,20 @@ void ScreenCapturerSck::OnShareableContentCreated(SCShareableContent* content,
     captured_display = content.displays.firstObject;
   }
 
+  NSMutableArray* excluded_applications = [[NSMutableArray alloc] init];
+  for (const auto& application : excluded_applications_) {
+    for (SCRunningApplication* running_application in content.applications)  {
+      if (running_application.processID == (pid_t)application) {
+        [excluded_applications addObject:running_application];
+      }
+    }
+  }
+
   SCContentFilter* filter =
       [[SCContentFilter alloc] initWithDisplay:captured_display
-                              excludingWindows:@[]];
+                              excludingApplications:excluded_applications
+                              exceptingWindows:@[]];
+
   StartWithFilter(filter);
 }
 
