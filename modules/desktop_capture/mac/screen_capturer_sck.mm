@@ -84,7 +84,7 @@ class API_AVAILABLE(macos(14.0)) ScreenCapturerSck final
   void NotifySourceError();
 
   // Called after a SCStreamDelegate stop notification.
-  void NotifyCaptureStopped(SCStream* stream);
+  void NotifyCaptureStopped(SCStream* stream, bool permanent);
 
   // Called by SckHelper when shareable content is returned by ScreenCaptureKit.
   // `content` will be nil if an error occurred. May run on an arbitrary thread.
@@ -186,6 +186,9 @@ class API_AVAILABLE(macos(14.0)) ScreenCapturerSck final
 
   // List with application process ids to be excluded from the capture.
   std::vector<std::uint64_t> excluded_applications_;
+
+  // Signals that the user intentionally stopped the stream.
+  std::atomic<bool> user_stopped_stream_ = false;
 };
 
 /* Helper class for stringifying SCContentSharingPickerMode. Needed as
@@ -280,6 +283,11 @@ void ScreenCapturerSck::CaptureFrame() {
     RTC_LOG(LS_VERBOSE) << "ScreenCapturerSck " << this
                         << " CaptureFrame() -> ERROR_PERMANENT";
     callback_->OnCaptureResult(Result::ERROR_PERMANENT, nullptr);
+    return;
+  } else if (user_stopped_stream_) {
+    RTC_LOG(LS_VERBOSE) << "ScreenCapturerSck " << this
+                        << " CaptureFrame() -> ERROR_USER_STOPPED";
+    callback_->OnCaptureResult(Result::ERROR_USER_STOPPED, nullptr);
     return;
   }
 
@@ -437,13 +445,17 @@ void ScreenCapturerSck::NotifySourceError() {
   permanent_error_ = true;
 }
 
-void ScreenCapturerSck::NotifyCaptureStopped(SCStream* stream) {
+void ScreenCapturerSck::NotifyCaptureStopped(SCStream* stream, bool permanent) {
   MutexLock lock(&lock_);
   if (stream_ != stream) {
     return;
   }
   RTC_LOG(LS_INFO) << "ScreenCapturerSck " << this << " " << __func__ << ".";
-  permanent_error_ = true;
+  if (permanent) {
+    permanent_error_ = true;
+  } else {
+    user_stopped_stream_ = true;
+  }
 }
 
 bool ScreenCapturerSck::GetSourceList(SourceList* sources) {
@@ -834,7 +846,14 @@ std::unique_ptr<DesktopCapturer> CreateGenericCapturerSck(
   RTC_LOG(LS_INFO) << "ScreenCapturerSck " << _capturer << " " << __func__
                    << ".";
   if (_capturer) {
-    _capturer->NotifyCaptureStopped(stream);
+     switch (error.code) {
+      case SCStreamErrorUserStopped:
+        _capturer->NotifyCaptureStopped(stream, false);
+        break;
+      default:
+        _capturer->NotifyCaptureStopped(stream, true);
+        break;
+    }
   }
 }
 
@@ -844,7 +863,7 @@ std::unique_ptr<DesktopCapturer> CreateGenericCapturerSck(
   RTC_LOG(LS_INFO) << "ScreenCapturerSck " << _capturer << " " << __func__
                    << ".";
   if (_capturer) {
-    _capturer->NotifyCaptureStopped(stream);
+    //_capturer->NotifyCaptureStopped(stream);
   }
 }
 
