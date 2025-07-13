@@ -18,6 +18,7 @@
 #include "api/sequence_checker.h"
 #include "modules/desktop_capture/mac/desktop_frame_iosurface.h"
 #include "modules/desktop_capture/shared_desktop_frame.h"
+  // used for desktop capture.
 #include "rtc_base/logging.h"
 #include "rtc_base/synchronization/mutex.h"
 #include "rtc_base/thread_annotations.h"
@@ -334,14 +335,14 @@ void ScreenCapturerSck::EnsurePickerHandle() {
   RTC_DCHECK_RUN_ON(&api_checker_);
   if (!picker_handle_ && capture_options_.allow_sck_system_picker()) {
     picker_handle_ = CreateSckPickerHandle();
-    RTC_LOG(LS_INFO) << "ScreenCapturerSck " << this
-                     << " Created picker handle. allow_sck_system_picker="
-                     << capture_options_.allow_sck_system_picker()
-                     << ", source="
-                     << (picker_handle_ ? picker_handle_->Source() : -1)
-                     << ", modes="
-                     << StringifiableSCContentSharingPickerMode{
-                            .modes_ = picker_modes_};
+    //RTC_LOG(LS_INFO) << "ScreenCapturerSck " << this
+    //                 << " Created picker handle. allow_sck_system_picker="
+    //                 << capture_options_.allow_sck_system_picker()
+    //                 << ", source="
+    //                 << (picker_handle_ ? picker_handle_->Source() : -1)
+    //                 << ", modes="
+    //                 << StringifiableSCContentSharingPickerMode{
+    //                        .modes_ = picker_modes_};
   }
 }
 
