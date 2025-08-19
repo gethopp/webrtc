@@ -128,6 +128,18 @@ void ScreenCastPortal::SetSessionDetails(
   if (session_details.pipewire_stream_node_id) {
     pw_stream_node_id_ = session_details.pipewire_stream_node_id;
   }
+  if (session_details.top) {
+    top_ = session_details.top;
+  }
+  if (session_details.left) {
+    left_ = session_details.left;
+  }
+  if (session_details.width) {
+    width_ = session_details.width;
+  }
+  if (session_details.height) {
+    height_ = session_details.height;
+  }
 }
 
 void ScreenCastPortal::Start() {
@@ -137,7 +149,16 @@ void ScreenCastPortal::Start() {
 }
 
 xdg_portal::SessionDetails ScreenCastPortal::GetSessionDetails() {
-  return {};  // No-op
+  return xdg_portal::SessionDetails{
+      proxy_,
+      cancellable_,
+      session_handle_,
+      pw_stream_node_id_,
+      width_,
+      height_,
+      top_,
+      left_
+  };
 }
 
 void ScreenCastPortal::OnPortalDone(RequestResponse result) {
@@ -392,6 +413,12 @@ void ScreenCastPortal::OnStartRequestResponseSignal(GDBusConnection* connection,
       }
 
       that->pw_stream_node_id_ = stream_id;
+
+      int32_t width = 0,  height = 0, top = 0, left = 0;
+      g_variant_lookup(options.get(), "position", "(ii)", &left, &top);
+      g_variant_lookup(options.get(), "size", "(ii)", &width, &height);
+      xdg_portal::SessionDetails details{nullptr, nullptr, std::string{}, 0, width, height, top, left};
+      that->SetSessionDetails(details);
 
       break;
     }

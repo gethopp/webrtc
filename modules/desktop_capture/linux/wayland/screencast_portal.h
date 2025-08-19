@@ -168,6 +168,12 @@ class RTC_EXPORT ScreenCastPortal
   guint start_request_signal_id_ = 0;
   guint session_closed_signal_id_ = 0;
 
+  // Temporary solution for storing stream origin
+  int32_t width_ = 0;
+  int32_t height_ = 0;
+  int32_t top_ = 0;
+  int32_t left_ = 0;
+
   void UnsubscribeSignalHandlers();
   static void OnProxyRequested(GObject* object,
                                GAsyncResult* result,

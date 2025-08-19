@@ -53,6 +53,7 @@ class RTC_EXPORT BaseCapturerPipeWire
   bool SelectSource(SourceId id) override;
   DelegatedSourceListController* GetDelegatedSourceListController() override;
   void SetMaxFrameRate(uint32_t max_frame_rate) override;
+  DesktopCaptureMetadata GetMetadata() override;
 
   // DelegatedSourceListController
   void Observe(Observer* observer) override;
