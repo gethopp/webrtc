@@ -26,6 +26,10 @@ struct SessionDetails {
   GCancellable* cancellable = nullptr;
   std::string session_handle;
   uint32_t pipewire_stream_node_id = 0;
+  int32_t width = 0;
+  int32_t height = 0;
+  int32_t top = 0;
+  int32_t left = 0;
 };
 
 }  // namespace xdg_portal

@@ -453,9 +453,51 @@ void ScreenCapturerSck::NotifyCaptureStopped(SCStream* stream, bool permanent) {
 bool ScreenCapturerSck::GetSourceList(SourceList* sources) {
   RTC_DCHECK_RUN_ON(&api_checker_);
   sources->clear();
+
   if (capture_options_.allow_sck_system_picker() && picker_handle_) {
     sources->push_back({picker_handle_->Source(), std::string()});
+    return true;
   }
+
+  __block SCShareableContent* shareable_content = nil;
+  __block NSError* fetch_error = nil;
+
+  // Use synchronous approach with semaphore to wait for async completion
+  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+
+  [SCShareableContent getShareableContentWithCompletionHandler:^(SCShareableContent* content, NSError* error) {
+    shareable_content = content;
+    fetch_error = error;
+    dispatch_semaphore_signal(semaphore);
+  }];
+
+  // Wait for the completion handler
+  dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+
+  if (fetch_error || !shareable_content) {
+    RTC_LOG(LS_ERROR) << "ScreenCapturerSck " << this
+                      << " GetSourceList failed to get shareable content with error code "
+                      << (fetch_error ? fetch_error.code : 0) << ".";
+    return false;
+  }
+
+  if (!shareable_content.displays.count) {
+    RTC_LOG(LS_WARNING) << "ScreenCapturerSck " << this
+                        << " GetSourceList returned no displays.";
+    return true; // Return true but with empty list
+  }
+
+  // Populate sources with available displays
+  for (SCDisplay* display in shareable_content.displays) {
+    DesktopCapturer::Source source;
+    source.id = static_cast<SourceId>(display.displayID);
+
+    source.display_id = display.displayID;
+    sources->push_back(source);
+  }
+
+  RTC_LOG(LS_INFO) << "ScreenCapturerSck " << this
+                   << " GetSourceList found " << sources->size() << " displays.";
   return true;
 }
 
