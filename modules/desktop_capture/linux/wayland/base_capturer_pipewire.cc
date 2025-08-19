@@ -243,4 +243,7 @@ void BaseCapturerPipeWire::SendFramesImmediately(bool send_frames_immediately) {
   send_frames_immediately_ = send_frames_immediately;
 }
 
+DesktopCaptureMetadata BaseCapturerPipeWire::GetMetadata() {
+  return DesktopCaptureMetadata{GetSessionDetails()};
+}
 }  // namespace webrtc
