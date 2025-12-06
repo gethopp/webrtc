@@ -679,8 +679,8 @@ int LibvpxVp9Encoder::InitEncode(const VideoCodec* inst,
   config_->rc_undershoot_pct = 100;
   config_->rc_overshoot_pct = 15;
   config_->rc_buf_initial_sz = 0;
-  config_->rc_buf_optimal_sz = 200;
-  config_->rc_buf_sz = 300;
+  config_->rc_buf_optimal_sz = 50;
+  config_->rc_buf_sz = 50;
   // Set the maximum target size of any key-frame.
   rc_max_intra_target_ = MaxIntraTarget(config_->rc_buf_optimal_sz);
   // Key-frame interval is enforced manually by this wrapper.
