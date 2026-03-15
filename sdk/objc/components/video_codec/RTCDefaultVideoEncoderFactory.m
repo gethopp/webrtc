@@ -28,6 +28,16 @@
 @synthesize preferredCodec;
 
 + (NSArray<RTC_OBJC_TYPE(RTCVideoCodecInfo) *> *)supportedCodecs {
+  // High Profile, Level 5.1 - best compression for 1080p30+ and 4K
+  NSDictionary<NSString *, NSString *> *highParams = @{
+    @"profile-level-id" : @"640033",
+    @"level-asymmetry-allowed" : @"1",
+    @"packetization-mode" : @"1",
+  };
+  RTC_OBJC_TYPE(RTCVideoCodecInfo) *highInfo =
+      [[RTC_OBJC_TYPE(RTCVideoCodecInfo) alloc] initWithName:RTC_CONSTANT_TYPE(RTCVideoCodecH264Name)
+                                                  parameters:highParams];
+
   NSDictionary<NSString *, NSString *> *constrainedHighParams = @{
     @"profile-level-id" : RTC_CONSTANT_TYPE(RTCMaxSupportedH264ProfileLevelConstrainedHigh),
     @"level-asymmetry-allowed" : @"1",
@@ -36,6 +46,16 @@
   RTC_OBJC_TYPE(RTCVideoCodecInfo) *constrainedHighInfo =
       [[RTC_OBJC_TYPE(RTCVideoCodecInfo) alloc] initWithName:RTC_CONSTANT_TYPE(RTCVideoCodecH264Name)
                                                   parameters:constrainedHighParams];
+
+  // Main Profile, Level 4.0 - 1080p30 with B-frames and CABAC
+  NSDictionary<NSString *, NSString *> *mainParams = @{
+    @"profile-level-id" : @"4d0028",
+    @"level-asymmetry-allowed" : @"1",
+    @"packetization-mode" : @"1",
+  };
+  RTC_OBJC_TYPE(RTCVideoCodecInfo) *mainInfo =
+      [[RTC_OBJC_TYPE(RTCVideoCodecInfo) alloc] initWithName:RTC_CONSTANT_TYPE(RTCVideoCodecH264Name)
+                                                  parameters:mainParams];
 
   NSDictionary<NSString *, NSString *> *constrainedBaselineParams = @{
     @"profile-level-id" : RTC_CONSTANT_TYPE(RTCMaxSupportedH264ProfileLevelConstrainedBaseline),
@@ -50,7 +70,9 @@
       [[RTC_OBJC_TYPE(RTCVideoCodecInfo) alloc] initWithName:RTC_CONSTANT_TYPE(RTCVideoCodecVp8Name)];
 
   NSMutableArray<RTC_OBJC_TYPE(RTCVideoCodecInfo) *> *result = [@[
+    highInfo,
     constrainedHighInfo,
+    mainInfo,
     constrainedBaselineInfo,
     vp8Info,
   ] mutableCopy];
