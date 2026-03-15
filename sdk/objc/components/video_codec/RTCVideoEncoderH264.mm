@@ -52,15 +52,10 @@
 
 namespace {  // anonymous namespace
 
-// The ratio between kVTCompressionPropertyKey_DataRateLimits and
-// kVTCompressionPropertyKey_AverageBitRate. The data rate limit is set higher
-// than the average bit rate to avoid undershooting the target.
-const float kLimitToAverageBitRateFactor = 10.0f;
 // These thresholds deviate from the default h264 QP thresholds, as they
 // have been found to work better on devices that support VideoToolbox
 const int kLowH264QpThreshold = 28;
-const int kHighH264QpThreshold = 39;
-const int kBitsPerByte = 8;
+const int kHighH264QpThreshold = 51;
 
 const OSType kNV12PixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
 
@@ -69,26 +64,12 @@ typedef NS_ENUM(NSInteger, RTC_OBJC_TYPE(RTCVideoEncodeMode)) {
   RTC_OBJC_TYPE(RTCVideoEncodeModeConstant) = 1,
 };
 
-NSArray *CreateRateLimitArray(uint32_t computedBitrateBps, RTC_OBJC_TYPE(RTCVideoEncodeMode) mode) {
-  switch (mode) {
-    case RTC_OBJC_TYPE(RTCVideoEncodeModeVariable): {
-      // 5 seconds should be an okay interval for VBR to enforce the long-term
-      // limit.
-      float avgInterval = 5.0;
-      uint32_t avgBytesPerSecond = computedBitrateBps / kBitsPerByte * avgInterval;
-      // And the peak bitrate is measured per-second in a way similar to CBR.
-      float peakInterval = 1.0;
-      uint32_t peakBytesPerSecond =
-          computedBitrateBps * kLimitToAverageBitRateFactor / kBitsPerByte;
-      return @[ @(peakBytesPerSecond), @(peakInterval), @(avgBytesPerSecond), @(avgInterval) ];
-    }
-    case RTC_OBJC_TYPE(RTCVideoEncodeModeConstant): {
-      // CBR should be enforces with granularity of a second.
-      float targetInterval = 1.0;
-      int32_t targetBitrate = computedBitrateBps / kBitsPerByte;
-      return @[ @(targetBitrate), @(targetInterval) ];
-    }
-  }
+// FFmpeg-style 2-element DataRateLimits: [bytes_per_second, 1s].
+// Uses maxBitrate as the peak rate limit (like FFmpeg's rc_max_rate).
+NSArray *CreateRateLimitArray(uint32_t maxBitrateBps) {
+  int64_t bytesPerSecond = maxBitrateBps >> 3;
+  int64_t oneSecond = 1;
+  return @[ @(bytesPerSecond), @(oneSecond) ];
 }
 
 // Struct that we pass to the encoder per frame to encode. We receive it again
@@ -744,12 +725,12 @@ NSUInteger GetMaxSampleRate(
     }];
   }
 
-  // Enable low-latency video encoding
-  if (@available(iOS 14.5, macCatalyst 14.5, macOS 11.3, tvOS 14.5, visionOS 1.0, *)) {
-    [encoder_specs addEntriesFromDictionary:@{
-      (NSString *)kVTVideoEncoderSpecification_EnableLowLatencyRateControl : @(YES),
-    }];
-  }
+  // NOTE: EnableLowLatencyRateControl intentionally disabled — conflicts with ReferenceBufferCount=1.
+  // if (@available(iOS 14.5, macCatalyst 14.5, macOS 11.3, tvOS 14.5, visionOS 1.0, *)) {
+  //   [encoder_specs addEntriesFromDictionary:@{
+  //     (NSString *)kVTVideoEncoderSpecification_EnableLowLatencyRateControl : @(YES),
+  //   }];
+  // }
 
   OSStatus status = VTCompressionSessionCreate(
       nullptr,  // use default allocator
@@ -800,6 +781,10 @@ NSUInteger GetMaxSampleRate(
                        << " mode: " << _codecMode;
       SetVTSessionProperty(
           _compressionSession, kVTCompressionPropertyKey_MaxAllowedFrameQP, kHighH264QpThreshold);
+      if (@available(iOS 16.0, macOS 13.0, *)) {
+        SetVTSessionProperty(
+            _compressionSession, kVTCompressionPropertyKey_MinAllowedFrameQP, kLowH264QpThreshold);
+      }
     }
   }
   SetVTSessionProperty(
@@ -825,6 +810,25 @@ NSUInteger GetMaxSampleRate(
   SetVTSessionProperty(_compressionSession,
                        kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration,
                        240);
+
+  // Single reference frame — matches Sunshine/FFmpeg max_ref_frames=1.
+  if (@available(iOS 17.0, macOS 13.0, *)) {
+    SetVTSessionProperty(
+        _compressionSession, kVTCompressionPropertyKey_ReferenceBufferCount, 1);
+  }
+
+  // Set DataRateLimits once using maxBitrate as the peak rate.
+  if (_maxBitrate > 0) {
+    OSStatus status = VTSessionSetProperty(
+        _compressionSession,
+        kVTCompressionPropertyKey_DataRateLimits,
+        (__bridge CFArrayRef)CreateRateLimitArray(_maxBitrate));
+    if (status != noErr) {
+      RTC_LOG(LS_ERROR) << "Failed to set initial data rate limits";
+    } else {
+      RTC_LOG(LS_INFO) << "Set data rate limits to " << (_maxBitrate >> 3) << " bytes/s";
+    }
+  }
 }
 
 - (void)destroyCompressionSession {
@@ -881,15 +885,15 @@ NSUInteger GetMaxSampleRate(
       RTC_LOG(LS_INFO) << "Did update encoder bitrate: " << computedBitrateBps;
     }
 
-    status = VTSessionSetProperty(
-        _compressionSession,
-        kVTCompressionPropertyKey_DataRateLimits,
-        (__bridge CFArrayRef)CreateRateLimitArray(computedBitrateBps, _encodeMode));
-    if (status != noErr) {
-      RTC_LOG(LS_ERROR) << "Failed to update encoder data rate limits";
-    } else {
-      RTC_LOG(LS_INFO) << "Did update encoder data rate limits";
-    }
+    //status = VTSessionSetProperty(
+    //    _compressionSession,
+    //    kVTCompressionPropertyKey_DataRateLimits,
+    //    (__bridge CFArrayRef)CreateRateLimitArray(computedBitrateBps, _encodeMode));
+    //if (status != noErr) {
+    //  RTC_LOG(LS_ERROR) << "Failed to update encoder data rate limits";
+    //} else {
+    //  RTC_LOG(LS_INFO) << "Did update encoder data rate limits";
+    //}
 
     _encoderBitrateBps = computedBitrateBps;
   }
@@ -977,4 +981,3 @@ NSUInteger GetMaxSampleRate(
 }
 
 @end
-
