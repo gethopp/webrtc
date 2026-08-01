@@ -61,7 +61,8 @@
 
     // H265
     auto *h265Codec = [[RTC_OBJC_TYPE(RTCVideoCodecInfo) alloc]
-        initWithName:RTC_CONSTANT_TYPE(RTCVideoCodecH265Name)];
+        initWithName:RTC_CONSTANT_TYPE(RTCVideoCodecH265Name)
+          parameters:@{@"level-id": @"153", @"tx-mode": @"SRST"}];
     [addingCodecs addObject:h265Codec];
 
     return [supportedCodecs arrayByAddingObjectsFromArray: addingCodecs];

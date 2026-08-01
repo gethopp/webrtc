@@ -54,8 +54,8 @@ namespace {  // anonymous namespace
 
 // These thresholds deviate from the default h265 QP thresholds, as they
 // have been found to work better on devices that support VideoToolbox
-const int kLowh265QpThreshold = 28;
-const int kHighh265QpThreshold = 39;
+const int kLowh265QpThreshold = 23;
+const int kHighh265QpThreshold = 51;
 
 // Struct that we pass to the encoder per frame to encode. We receive it again
 // in the encoder callback.
@@ -192,7 +192,7 @@ void compressionOutputCallback(void* encoder, void* params, OSStatus status,
   _mode = settings.mode;
 
   // We can only set average bitrate on the HW encoder.
-  _targetBitrateBps = settings.startBitrate;
+  _targetBitrateBps = settings.startBitrate * 1000;  // startBitrate is in kbps.
   _bitrateAdjuster->SetTargetBitrateBps(_targetBitrateBps);
 
   return [self resetCompressionSession];
@@ -448,14 +448,19 @@ void compressionOutputCallback(void* encoder, void* params, OSStatus status,
   // SetVTSessionProperty(_compressionSession,
   // kVTCompressionPropertyKey_ProfileLevel, _profile);
   SetVTSessionProperty(_compressionSession, kVTCompressionPropertyKey_AllowFrameReordering, false);
-  // Set maximum QP for screen sharing mode on supported OS versions.
+  // Set QP bounds for screen sharing mode on supported OS versions.
   // https://developer.apple.com/documentation/videotoolbox/kvtcompressionpropertykey_maxallowedframeqp
   if (@available(iOS 15.0, macOS 12.0, *)) {
     if (_mode == RTC_OBJC_TYPE(RTCVideoCodecModeScreensharing)) {
-      RTC_LOG(LS_INFO) << "Configuring VideoToolbox to use maxQP: " << kHighh265QpThreshold
+      RTC_LOG(LS_INFO) << "Configuring VideoToolbox maxQP: " << kHighh265QpThreshold
                        << " mode: " << _mode;
       SetVTSessionProperty(_compressionSession, kVTCompressionPropertyKey_MaxAllowedFrameQP,
                            kHighh265QpThreshold);
+      if (@available(iOS 16.0, macOS 13.0, *)) {
+        SetVTSessionProperty(_compressionSession, kVTCompressionPropertyKey_MinAllowedFrameQP,
+                             kLowh265QpThreshold);
+        RTC_LOG(LS_INFO) << "Configuring VideoToolbox minQP: " << kLowh265QpThreshold;
+      }
     }
   }
   // Reduce the encoder's internal buffering for lower latency if available.
@@ -494,6 +499,20 @@ void compressionOutputCallback(void* encoder, void* params, OSStatus status,
 - (void)setEncoderBitrateBps:(uint32_t)bitrateBps {
   if (_compressionSession) {
     SetVTSessionProperty(_compressionSession, kVTCompressionPropertyKey_AverageBitRate, bitrateBps);
+
+    // Hard cap: [bytes_per_second, 1s window].
+    uint32_t maxBytesPerSecond = bitrateBps / 8;
+    float windowSeconds = 1.0f;
+    CFNumberRef bytes = CFNumberCreate(nullptr, kCFNumberSInt32Type, &maxBytesPerSecond);
+    CFNumberRef window = CFNumberCreate(nullptr, kCFNumberFloat32Type, &windowSeconds);
+    CFTypeRef limits[] = {bytes, window};
+    CFArrayRef dataRateLimits = CFArrayCreate(nullptr, limits, 2, &kCFTypeArrayCallBacks);
+    VTSessionSetProperty(_compressionSession, kVTCompressionPropertyKey_DataRateLimits,
+                         dataRateLimits);
+    CFRelease(bytes);
+    CFRelease(window);
+    CFRelease(dataRateLimits);
+
     _encoderBitrateBps = bitrateBps;
   }
 }
